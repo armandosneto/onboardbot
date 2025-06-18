@@ -1,0 +1,19 @@
+# Core LangChain and Google libraries
+langchain==0.2.5
+langchain-google-genai==1.0.6
+langchain-community==0.2.5
+langchain-text-splitters==0.2.1
+# Pinned to a version compatible with langchain-google-genai==1.0.6
+google-generativeai==0.5.2
+
+# Vector Store
+faiss-cpu==1.8.0
+
+# Utility libraries
+python-dotenv==1.0.1
+click==8.1.7
+GitPython==3.1.43
+
+# Dependencies for document loaders
+unstructured==0.14.8
+beautifulsoup4==4.12.3

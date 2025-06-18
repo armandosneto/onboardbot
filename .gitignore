@@ -1,0 +1,23 @@
+# Environment variables
+.env
+
+# Virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Vector store data
+vector_store/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE and editor folders
+.vscode/
+.idea/
+*.swp
+*.swo
