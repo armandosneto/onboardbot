@@ -15,5 +15,5 @@ click==8.1.7
 GitPython==3.1.43
 
 # Dependencies for document loaders
-unstructured==0.14.8
+unstructured==0.17.2
 beautifulsoup4==4.12.3
