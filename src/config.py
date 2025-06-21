@@ -22,4 +22,4 @@ GEMINI_GENERATION_MODEL = "gemini-1.5-flash"
 
 # --- RAG Configuration ---
 # Número de documentos relevantes a serem recuperados para o contexto
-RETRIEVER_K = 5
+RETRIEVER_K = 8

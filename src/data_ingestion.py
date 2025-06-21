@@ -3,6 +3,7 @@ import os
 import glob
 from git import Repo
 from dotenv import load_dotenv
+import random
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader
@@ -48,10 +49,12 @@ def process_markdown_files(repo_path):
         try:
             with open(md_file, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
             md_chunks = markdown_splitter.split_text(content)
             for chunk in md_chunks:
                 chunk.metadata['source'] = os.path.relpath(md_file, PROJECT_ROOT)
+                # Adiciona cabeçalhos relevantes ao metadata, se existirem
+                if hasattr(chunk, 'metadata') and 'headers' in chunk.metadata:
+                    chunk.metadata['headers'] = chunk.metadata['headers']
             all_md_chunks.extend(md_chunks)
         except Exception as e:
             print(f"Aviso: Pulando arquivo Markdown com erro de leitura: {md_file}")
@@ -67,7 +70,7 @@ def process_code_files(repo_path, language, extension):
     all_code_chunks = []
     
     code_splitter = RecursiveCharacterTextSplitter.from_language(
-        language=language, chunk_size=1000, chunk_overlap=100
+        language=language, chunk_size=1200, chunk_overlap=300
     )
 
     for code_file in code_files:
@@ -75,7 +78,6 @@ def process_code_files(repo_path, language, extension):
             loader = TextLoader(code_file, encoding='utf-8')
             documents = loader.load()
             for doc in documents:
-                # CORREÇÃO: Voltando a usar PROJECT_ROOT para um caminho completo
                 doc.metadata['source'] = os.path.relpath(code_file, PROJECT_ROOT)
             chunks = code_splitter.split_documents(documents)
             all_code_chunks.extend(chunks)
@@ -124,5 +126,26 @@ def run_ingestion():
     ts_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.TS, "ts")
     
     all_chunks = md_chunks + py_chunks + js_chunks + ts_chunks
-    
+
+    # Exibir aleatoriamente alguns chunks de cada tipo
+    def print_random_chunks(chunks, tipo, n=3):
+        print(f"\nExemplos aleatórios de chunks [{tipo}]:")
+        if not chunks:
+            print("Nenhum chunk encontrado.")
+            return
+        exemplos = random.sample(chunks, min(n, len(chunks)))
+        for i, chunk in enumerate(exemplos, 1):
+            print(f"--- {tipo} Chunk {i} ---")
+            if hasattr(chunk, 'page_content'):
+                print(chunk.page_content[:500])  # Limita a 500 caracteres
+            else:
+                print(str(chunk)[:500])
+            print(f"Fonte: {chunk.metadata.get('source', 'desconhecida')}")
+            print()
+
+    print_random_chunks(md_chunks, "Markdown")
+    print_random_chunks(py_chunks, "Python")
+    print_random_chunks(js_chunks, "JavaScript")
+    print_random_chunks(ts_chunks, "TypeScript")
+
     create_and_save_faiss_index(all_chunks)

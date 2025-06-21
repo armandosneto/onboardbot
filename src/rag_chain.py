@@ -25,7 +25,7 @@ def initialize_llm(api_key):
     os.environ["GOOGLE_API_KEY"] = api_key
     llm = ChatGoogleGenerativeAI(
         model=GEMINI_GENERATION_MODEL,
-        temperature=0.1,
+        temperature=0.2,  # Temperatura levemente maior para respostas mais detalhadas
         convert_system_message_to_human=True
     ) # [5]
     return llm
@@ -52,14 +52,13 @@ def create_retriever(vector_store, k=RETRIEVER_K):
 def create_prompt_template():
     """Cria o template de prompt para a cadeia RAG."""
     template = """
-Você é um assistente especialista na plataforma de código aberto Rocket.Chat. Sua tarefa é responder às perguntas dos usuários com base estritamente no contexto fornecido, que é extraído da base de código e da documentação oficial do Rocket.Chat.
+Você é um assistente especialista no Rocket.Chat, ajudando desenvolvedores a entender o projeto e acelerar o onboarding.
 
-Regras importantes:
-- Responda à pergunta usando SOMENTE as informações do seguinte contexto.
-- Não utilize nenhum conhecimento prévio ou externo.
-- Se o contexto não contiver informações suficientes para responder à pergunta, afirme claramente: "Com base no contexto fornecido, não tenho informações suficientes para responder a esta pergunta."
-- Seja conciso e direto ao ponto.
-- Ao final da sua resposta, liste as fontes que você utilizou, citando o caminho do arquivo de cada trecho do contexto.
+Regras:
+- Responda à pergunta usando o máximo de informações relevantes do contexto abaixo.
+- Se necessário, combine informações de diferentes trechos para construir uma resposta completa.
+- Se o contexto não for suficiente, explique o que está faltando, mas tente sempre extrair o máximo possível.
+- Sempre cite os arquivos e, se possível, os cabeçalhos ou funções de onde as informações foram retiradas.
 
 Contexto:
 {context}
@@ -95,12 +94,18 @@ def ask_question(question: str):
         vector_store = load_vector_store(api_key)
         retriever = create_retriever(vector_store)
         prompt = create_prompt_template()
-        
         rag_chain = create_rag_chain(retriever, prompt, llm)
-        
+
+        # Recupera os documentos para mostrar o prompt formatado
+        docs = retriever.get_relevant_documents(question)
+        context_str = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
+        prompt_str = prompt.format(context=context_str, question=question)
+        print("\nPrompt utilizado:\n" + "-"*40)
+        print(prompt_str)
+        print("-"*40)
+
         print("Gerando resposta...")
         answer = rag_chain.invoke(question)
-        
         return answer
     except Exception as e:
         return f"Ocorreu um erro ao processar sua pergunta: {e}"
