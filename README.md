@@ -22,7 +22,7 @@ Para este TCC, o repositório do([https://github.com/RocketChat/Rocket.Chat](htt
 - **Respostas Baseadas em Evidências:** Responde a perguntas sobre a arquitetura, configuração e funcionalidades usando o conteúdo exato do repositório.
 - **Processamento Inteligente de Código:** Utiliza divisores de texto (_text splitters_) específicos para código (`.py`, `.js`, `.ts`) e documentação (`.md`), preservando o contexto sintático e semântico. [1, 2]
 - **Citação de Fontes:** Cada resposta inclui os arquivos de origem que foram usados como contexto, permitindo que o desenvolvedor verifique e aprofunde a informação.
-- **Interface de Linha de Comando:** Interação simples e direta através de dois comandos principais: `ingest` e `ask`. [3]
+- **Interface de Linha de Comando:** Interação simples e direta através de três comandos principais: `ingest`, `ask` e `chat`. [3]
 
 ---
 
@@ -81,7 +81,7 @@ O arquivo `.gitignore` já está configurado para que este arquivo não seja env
 
 ### 4. Execução
 
-A aplicação possui dois comandos principais.
+A aplicação possui três comandos principais.
 
 #### a) Ingestão de Dados (Passo único e demorado)
 
@@ -107,6 +107,39 @@ python main.py ask "Como funciona a autenticação OAuth?"
 python main.py ask "Qual a função da classe Livechat?"
 python main.py ask "Como eu configuro um webhook de saída?"
 python main.py ask "Onde estão definidos os papéis de usuário (roles)?"
+```
+
+#### c) Sessão de Chat Interativa
+
+O comando `chat` inicia uma sessão interativa no terminal, permitindo que você faça várias perguntas em sequência. O chatbot reescreve cada nova pergunta considerando o histórico da conversa, tornando as perguntas autossuficientes e o contexto mais claro.
+
+Para iniciar a sessão de chat, execute:
+
+```bash
+python main.py chat
+```
+
+- Digite suas perguntas diretamente no terminal.
+- Para encerrar a sessão, digite `sair` ou `exit`.
+
+**Exemplo de uso:**
+
+```bash
+python main.py chat
+```
+
+```
+Bem-vindo ao chat interativo! Digite sua pergunta ou 'sair' para encerrar.
+Você: Onde estão as configurações de autenticação?
+--- Resposta ---
+... (resposta do bot)
+----------------
+Você: E como eu altero o provedor OAuth?
+--- Resposta ---
+... (resposta do bot considerando o histórico)
+----------------
+Você: sair
+Sessão encerrada.
 ```
 
 ---
