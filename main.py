@@ -1,13 +1,14 @@
 import click
 import time
 from src.data_ingestion import run_ingestion
-from src.rag_chain import ask_question
+from src.rag_chain import get_runnable_with_history
+from langchain_core.messages import HumanMessage, AIMessage
 
 @click.group()
 def cli():
     """
     CLI para o chatbot RAG do Rocket.Chat.
-    Use 'ingest' para construir a base de conhecimento e 'ask' para fazer perguntas.
+    Use 'ingest' para construir a base de conhecimento, 'ask' para perguntas únicas e 'chat' para uma sessão interativa.
     """
     pass
 
@@ -39,15 +40,37 @@ def ask(question):
     click.echo(f"Pergunta recebida: '{question}'")
     click.echo("Consultando a base de conhecimento e gerando uma resposta...")
     start_time = time.time()
-    
     answer = ask_question(question)
-    
     end_time = time.time()
-    
     click.secho("\n--- Resposta ---", fg="cyan")
     click.echo(answer)
     click.secho("----------------", fg="cyan")
     click.echo(f"(Resposta gerada em {end_time - start_time:.2f} segundos)")
+
+@cli.command()
+def chat():
+    """
+    Inicia uma sessão de chat interativa com reescrita explícita da pergunta baseada no histórico.
+    Digite 'sair' ou 'exit' para encerrar a sessão.
+    """
+    click.secho("\nBem-vindo ao chat interativo! Digite sua pergunta ou 'sair' para encerrar.", fg="yellow")
+    rag_with_rewrite, memory = get_runnable_with_history()
+    session_id = "default"
+    while True:
+        user_input = click.prompt(click.style("Você", fg="green"), type=str)
+        if user_input.strip().lower() in ["sair", "exit"]:
+            click.secho("Sessão encerrada.", fg="yellow")
+            break
+        start_time = time.time()
+        try:
+            response = rag_with_rewrite({"question": user_input})
+            end_time = time.time()
+            click.secho("\n--- Resposta ---", fg="cyan")
+            click.echo(response)
+            click.secho("----------------", fg="cyan")
+            click.echo(f"(Resposta gerada em {end_time - start_time:.2f} segundos)\n")
+        except Exception as e:
+            click.secho(f"Ocorreu um erro: {e}", fg="red")
 
 if __name__ == '__main__':
     cli()

@@ -11,6 +11,9 @@ from src.config import (
     GEMINI_GENERATION_MODEL,
     RETRIEVER_K
 )
+from langchain.memory import ConversationBufferMemory
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.runnables.history import RunnableWithMessageHistory
 
 def load_api_key():
     """Carrega a chave da API do Google do arquivo.env."""
@@ -52,7 +55,7 @@ def create_retriever(vector_store, k=RETRIEVER_K):
 def create_prompt_template():
     """Cria o template de prompt para a cadeia RAG."""
     template = """
-Você é um assistente especialista no Rocket.Chat, ajudando desenvolvedores a entender o projeto e acelerar o onboarding.
+Você é um assistente especialista no projeto Rocket.Chat, ajudando desenvolvedores a entender o projeto e acelerar o onboarding.
 
 Regras:
 - Responda à pergunta usando o máximo de informações relevantes do contexto abaixo.
@@ -109,4 +112,64 @@ def ask_question(question: str):
         return answer
     except Exception as e:
         return f"Ocorreu um erro ao processar sua pergunta: {e}"
+
+def get_memory():
+    """Retorna uma instância de memória de buffer de conversa."""
+    return ConversationBufferMemory(return_messages=True, memory_key="chat_history")
+
+def rewrite_question_with_history(llm, chat_history, question):
+    """
+    Usa o LLM para reescrever a pergunta do usuário de forma autossuficiente, considerando o histórico da conversa.
+    """
+    history_str = "\n".join([
+    f"Usuário: {msg.content}" if msg.type == "human" else f"Bot: {msg.content}"
+    for msg in chat_history
+    ])
+    
+    rewrite_prompt_text = (
+        "Dada a conversa abaixo, reescreva a última pergunta do usuário de forma totalmente autossuficiente, "
+        "removendo quaisquer expressões que façam referência ao histórico, como 'Considerando a conversa anterior', 'Com base no que foi dito', etc. "
+        "Faça um pequeno resumo do contexto, se necessário.\n\n"
+        "A pergunta reescrita deve ser clara e compreendida por alguém que não viu o histórico\n\n"
+        "Se a última pergunta já for autossuficiente, apenas a retorne.\n\n"
+        f"Histórico da conversa:\n{history_str}\n\n"
+        f"Última pergunta do usuário: {question}\n\n"
+        "Pergunta reescrita e autossuficiente:"
+    )
+    response = llm.invoke(rewrite_prompt_text)
+    return response.content.strip()
+
+def get_runnable_with_history():
+    """Prepara e retorna a cadeia conversacional e o objeto de memória."""
+    api_key = load_api_key()
+    llm = initialize_llm(api_key)
+    vector_store = load_vector_store(api_key)
+    retriever = create_retriever(vector_store)
+    prompt = create_prompt_template()
+    rag_chain = create_rag_chain(retriever, prompt, llm)
+    memory = get_memory()
+
+    def rag_with_rewrite(inputs):
+        """Função que encapsula a lógica de reescrita e RAG."""
+        # Carrega o histórico da memória
+        chat_history = memory.load_memory_variables({}).get("chat_history",)
+        question = inputs["question"]
+        
+        import click
+        # Se houver histórico, reescreve a pergunta. Senão, usa a original.
+        if not chat_history:
+            rewritten_question = question
+        else:
+            rewritten_question = rewrite_question_with_history(llm, chat_history, question)
+            click.secho(f"[Pergunta reescrita]: {rewritten_question}", fg="yellow")
+        
+        # Invoca a cadeia RAG com a pergunta (reescrita ou original)
+        final_answer = rag_chain.invoke(rewritten_question)
+        
+        # Salva a pergunta ORIGINAL do usuário e a RESPOSTA FINAL na memória.
+        memory.save_context({"input": question}, {"output": final_answer})
+        
+        return final_answer
+
+    return rag_with_rewrite, memory
 
