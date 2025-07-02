@@ -94,27 +94,63 @@ def create_rag_chain(retriever, prompt, llm):
     )
     return rag_chain
 
+# def ask_question(question: str):
+#     """Orquestra todo o processo de resposta a uma pergunta."""
+#     try:
+#         api_key = load_api_key()
+#         llm = initialize_llm(api_key)
+#         vector_store = load_vector_store(api_key)
+#         retriever = create_retriever(vector_store)
+#         prompt = create_prompt_template()
+#         rag_chain = create_rag_chain(retriever, prompt, llm)
+
+#         # Recupera os documentos para mostrar o prompt formatado
+#         docs = retriever.get_relevant_documents(question)
+#         context_str = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
+#         prompt_str = prompt.format(context=context_str, question=question)
+#         print("\nPrompt utilizado:\n" + "-"*40)
+#         print(prompt_str)
+#         print("-"*40)
+
+#         print("Gerando resposta...")
+#         answer = rag_chain.invoke(question)
+#         return answer
+#     except Exception as e:
+#         return f"Ocorreu um erro ao processar sua pergunta: {e}"
+
 def ask_question(question: str):
-    """Orquestra todo o processo de resposta a uma pergunta."""
+    """Decide dinamicamente se deve usar contexto ou não para responder a pergunta."""
     try:
         api_key = load_api_key()
         llm = initialize_llm(api_key)
-        vector_store = load_vector_store(api_key)
-        retriever = create_retriever(vector_store)
         prompt = create_prompt_template()
-        rag_chain = create_rag_chain(retriever, prompt, llm)
+        
+        # Decide se vai usar contexto
+        use_context = should_use_context(llm, question)
+		# Se a pergunta não precisar de contexto, não carrega o vetor store
+        if use_context:
+            vector_store = load_vector_store(api_key)
+            retriever = create_retriever(vector_store)
+            rag_chain = create_rag_chain(retriever, prompt, llm)
+            docs = retriever.get_relevant_documents(question)
+            context_str = "\n\n".join(
+                f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}"
+                for doc in docs
+            )
+            prompt_str = prompt.format(context=context_str, question=question)
+            print("\n[Com contexto ativado]\n" + "-"*40)
+        else:
+            # Se não precisar de contexto, usa o prompt direto
+            rag_chain = prompt | llm | StrOutputParser()
+            context_str = "Nenhum contexto necessário."
+            prompt_str = prompt.format(context=context_str, question=question)
+            print("\n[Sem contexto — resposta direta do LLM]\n" + "-"*40)
 
-        # Recupera os documentos para mostrar o prompt formatado
-        docs = retriever.get_relevant_documents(question)
-        context_str = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
-        prompt_str = prompt.format(context=context_str, question=question)
-        print("\nPrompt utilizado:\n" + "-"*40)
         print(prompt_str)
         print("-"*40)
 
         print("Gerando resposta...")
-        answer = rag_chain.invoke(question)
-        return answer
+        return rag_chain.invoke(question)
     except Exception as e:
         return f"Ocorreu um erro ao processar sua pergunta: {e}"
 
@@ -203,6 +239,55 @@ e integração com outras plataformas.
         "chat_history": chat_history,
         "question": question
     })
+
+# # Função para decidir se a pergunta deve usar contexto ou não
+# # Baseada na pergunta do usuário e no histórico de conversa.
+# # Retorna "SIM" ou "NÃO" dependendo da necessidade de contexto.
+# # Esta função é chamada antes de invocar a cadeia RAG.
+# # Ela analisa a pergunta e o histórico para determinar se o contexto técnico é necessário.
+def should_use_context(llm, question: str) -> bool:
+    """Decide se a pergunta necessita de contexto externo para ser respondida."""
+    system_prompt = """Você é um classificador de perguntas para um sistema RAG sobre o projeto Rocket.Chat.
+
+    Sua tarefa é responder apenas com "SIM" ou "NÃO" indicando se a pergunta precisa do **contexto técnico** do repositório (código-fonte ou documentação) para ser respondida com precisão.
+
+    - Responda "SIM" se a pergunta depender de detalhes do projeto, como arquivos, funções, configurações, lógica interna, APIs, rotas, autenticação, permissões etc.
+    - Responda "NÃO" se a pergunta for geral, institucional, de opinião, ou que pode ser respondida sem acesso ao conteúdo técnico do repositório.
+
+    Apenas responda com "SIM" ou "NÃO". Sem explicações.
+
+    Exemplos:
+    Pergunta: Qual o nome do CEO da Rocket.Chat?  
+    Resposta: NÃO
+
+    Pergunta: O Rocket.Chat é open source?  
+    Resposta: NÃO
+
+    Pergunta: Como configurar a autenticação via LDAP no Rocket.Chat?  
+    Resposta: SIM
+
+    Pergunta: Onde está definida a função `loginWithToken`?  
+    Resposta: SIM
+
+    Pergunta: Quais linguagens são usadas no projeto?  
+    Resposta: NÃO
+
+    Pergunta: O que o arquivo `startRocketChat.sh` faz?  
+    Resposta: SIM
+
+    Pergunta: Rocket.Chat suporta chamadas de vídeo?  
+    Resposta: NÃO
+
+    Pergunta: O que o método `validateUserToken` faz no backend?  
+    Resposta: SIM"""
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_prompt),
+        ("human", f"Pergunta: \"{question}\"\nResposta:")
+    ])
+    chain = prompt | llm | StrOutputParser()
+    result = chain.invoke({})
+    return result.strip().upper().startswith("S")
 
 def get_runnable_with_history():
     """Prepara e retorna a cadeia conversacional e o objeto de memória."""
