@@ -81,7 +81,6 @@ def create_rag_chain(retriever, prompt, llm, use_history=False):
     def format_docs(docs):
         # Formata os documentos recuperados em uma única string, incluindo a fonte
         formatted_docs = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
-        print("[Chunks retornados pelo retriever]:", formatted_docs)  # Adiciona o print para exibir os chunks
         return formatted_docs
 
     if use_history:
