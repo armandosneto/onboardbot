@@ -143,7 +143,7 @@ def ask_question(question: str):
 
 def get_memory():
     """Retorna uma instância de memória de buffer de conversa."""
-    return ConversationBufferMemory(k=8, return_messages=True, memory_key="chat_history")
+    return ConversationBufferMemory(k=5, return_messages=True, memory_key="chat_history")
 
 def rewrite_question_with_history(llm, chat_history, question, prompt=REWRITE_PROMPT):
     """
