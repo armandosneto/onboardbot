@@ -1,7 +1,7 @@
 import click
 import time
 from src.data_ingestion import run_ingestion
-from src.rag_chain import get_runnable_with_history
+from src.rag_chain import get_runnable_with_history, get_runnable_with_full_history
 from langchain_core.messages import HumanMessage, AIMessage
 
 @click.group()
@@ -64,6 +64,30 @@ def chat():
         start_time = time.time()
         try:
             response = rag_with_rewrite({"question": user_input})
+            end_time = time.time()
+            click.secho("\n--- Resposta ---", fg="cyan")
+            click.echo(response)
+            click.secho("----------------", fg="cyan")
+            click.echo(f"(Resposta gerada em {end_time - start_time:.2f} segundos)\n")
+        except Exception as e:
+            click.secho(f"Ocorreu um erro: {e}", fg="red")
+
+@cli.command()
+def chat_full():
+    """
+    Inicia uma sessão de chat interativa com o histórico completo.
+    Digite 'sair' ou 'exit' para encerrar a sessão.
+    """
+    click.secho("\nBem-vindo ao chat interativo com histórico completo! Digite sua pergunta ou 'sair' para encerrar.", fg="yellow")
+    rag_with_full_history, memory = get_runnable_with_full_history()
+    while True:
+        user_input = click.prompt(click.style("Você", fg="green"), type=str)
+        if user_input.strip().lower() in ["sair", "exit"]:
+            click.secho("Sessão encerrada.", fg="yellow")
+            break
+        start_time = time.time()
+        try:
+            response = rag_with_full_history({"question": user_input})
             end_time = time.time()
             click.secho("\n--- Resposta ---", fg="cyan")
             click.echo(response)

@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from operator import itemgetter
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
@@ -13,6 +14,7 @@ from src.config import (
 )
 from langchain.memory import ConversationBufferMemory
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from src.prompts import SYSTEM_PROMPT, REWRITE_PROMPT, REWRITE_PROMPT_2
 
 def load_api_key():
     """Carrega a chave da API do Google do arquivo.env."""
@@ -50,48 +52,70 @@ def create_retriever(vector_store, k=RETRIEVER_K):
     """Cria um retriever a partir do banco de dados vetorial."""
     return vector_store.as_retriever(search_kwargs={"k": k})
 
-def create_prompt_template():
+def create_prompt_template(use_history=False):
     """Cria o template de prompt para a cadeia RAG, separando as roles."""
-    
-    # Instrução de sistema, definindo o papel do assistente
-    system_prompt = """Você é um assistente especialista no projeto Rocket.Chat, ajudando desenvolvedores a entender o projeto e acelerar o onboarding.
 
-Regras:
-- Responda à pergunta usando o máximo de informações relevantes do contexto abaixo.
-- Se necessário, combine informações de diferentes trechos para construir uma resposta completa.
-- Se o contexto não for suficiente, explique o que está faltando, mas tente sempre extrair o máximo possível.
-- Sempre cite os arquivos e, se possível, os cabeçalhos ou funções de onde as informações foram retiradas."""
+    # Agora o system_prompt também terá um placeholder para o CONTEXTO.
+    # O contexto é apresentado como conhecimento interno do assistente.
+    system_prompt = SYSTEM_PROMPT
 
-    # Template da mensagem humana, com as variáveis do RAG
-    human_prompt = """Contexto:
-{context}
+    if use_history:
+        prompt = ChatPromptTemplate.from_messages([
+            # O system_prompt agora contém o {context}
+            ("system", system_prompt),
+            MessagesPlaceholder(variable_name="history"),
+            # A mensagem do humano contém APENAS a {question}
+            ("human", "{question}")
+        ])
+    else:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{question}")
+        ])
 
-Pergunta:
-{question}
-
-Resposta:"""
-
-    # Usa from_messages para criar um prompt com papéis explícitos
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human", human_prompt)
-    ])
-    
     return prompt
 
-def create_rag_chain(retriever, prompt, llm):
-    """Monta a cadeia RAG completa usando LCEL."""
-    
+def create_rag_chain(retriever, prompt, llm, use_history=False):
+    """Monta a cadeia RAG completa usando LCEL, com suporte opcional a histórico."""
+
     def format_docs(docs):
         # Formata os documentos recuperados em uma única string, incluindo a fonte
-        return "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
+        formatted_docs = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
+        print("[Chunks retornados pelo retriever]:", formatted_docs)  # Adiciona o print para exibir os chunks
+        return formatted_docs
 
-    rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-| prompt
-| llm
-| StrOutputParser()
-    )
+    if use_history:
+        # CADEIA CORRIGIDA
+        rag_chain = (
+            {
+                # 1. Extrai a "question" do dicionário de input e a passa para o retriever.
+                #    O resultado (docs) é então formatado por format_docs.
+                "context": itemgetter("prompt") | retriever | format_docs,
+                
+                # 2. Extrai a "history" do dicionário de input.
+                "history": itemgetter("history"),
+                
+                # 3. Extrai a "question" do dicionário de input.
+                "question": itemgetter("question"),
+            }
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+    else:
+        # A cadeia sem histórico já estava quase correta, mas vamos torná-la explícita também
+        rag_chain = (
+            {
+                # A chave "question" é passada para o retriever para buscar o contexto
+                "context": itemgetter("question") | retriever | format_docs,
+                # A chave "question" é passada diretamente para o prompt
+                "question": itemgetter("question"),
+            }
+            | prompt
+            | llm
+            | StrOutputParser()
+        )
+
     return rag_chain
 
 def ask_question(question: str):
@@ -122,70 +146,15 @@ def get_memory():
     """Retorna uma instância de memória de buffer de conversa."""
     return ConversationBufferMemory(k=8, return_messages=True, memory_key="chat_history")
 
-def rewrite_question_with_history(llm, chat_history, question):
+def rewrite_question_with_history(llm, chat_history, question, prompt=REWRITE_PROMPT):
     """
     Reescreve a pergunta do usuário de forma autossuficiente, usando as melhores práticas da LangChain (LCEL)
     de forma encapsulada. É um substituto direto da versão original.
     """
     
     # 1. Define a instrução de sistema (o papel do LLM) de forma clara.
-    system_prompt = """Você é um especialista em reescrever prompts. Sua função é analisar um histórico de conversa entre um desenvolvedor e um assistente de código e reescrever a última pergunta do desenvolvedor para que ela seja 100% autossuficiente, capturando a intenção original.
+    system_prompt = prompt
 
-Regras Fundamentais:
-- **Identifique a Intenção Real:** O mais importante é entender o que o usuário realmente quer, com base no que o bot acabou de dizer ou fazer.
-- **Incorpore o Contexto:** Integre detalhes essenciais do histórico na nova pergunta. Por exemplo, se o usuário diz "e sobre X?", a nova pergunta deve ser "Qual é a informação sobre X relacionada a Y?" ou "Considerando W, Y e Z, qual a informção sobre X?".
-- **Seja Direto:** A saída final não deve conter nenhuma referência à conversa anterior (ex: "com base em...", "considerando a conversa anterior...").
-- **Lide com Comandos:** Se a última entrada for um comando como "faça de novo" ou "resuma", sua tarefa é descobrir o que deve ser feito de novo ou resumido e criar uma instrução completa. Foque na última ação do Bot.
-- **Autossuficiência:** Se a pergunta original já for clara e completa, retorne-a sem modificações.
-- **Regra de Escape:** Se a pergunta do usuário for vaga (ex: "e sobre isso?", "quem são eles?") e o histórico da conversa não fornecer NENHUM contexto relevante para resolver a ambiguidade, NÃO TENTE EXPLICAR O PROBLEMA. Apenas retorne a pergunta original do usuário sem nenhuma alteração.
-- **Atenção a sua função:** Sua função é reescrever o comando/pergunta do usuário, não responder a ela. Foque em criar uma pergunta clara e autossuficiente.
-
-Exemplo de entrada:
----
-**Exemplo 1: Reutilizando o padrão da pergunta**
-
-Histórico:
-Usuário: Onde está definido o hook `useUser` no projeto?
-Assistente: O hook `useUser` está definido em `apps/meteor/client/hooks/useUser.ts`.
-Pergunta do Usuário: e o `usePermission`?
-
-**Instrução Autossuficiente Gerada:**
-Onde está definido o hook `usePermission` no projeto?
----
-**Exemplo 2: Lidando com o comando "faça de novo"**
-
-Histórico:
-Usuário: Liste todas as rotas de API relacionadas a `teams` no arquivo `apps/meteor/app/api/server/v1/teams.ts`.
-Assistente: As rotas encontradas são: `teams.create`, `teams.list`, `teams.addMembers`, `teams.removeMember`.
-Pergunta do Usuário: faça de novo
-
-**Instrução Autossuficiente Gerada:**
-Liste todas as rotas de API relacionadas a `teams` no arquivo `apps/meteor/app/api/server/v1/teams.ts`.
----
-**Exemplo 3: Adicionando contexto a uma pergunta específica**
-
-Histórico:
-Usuário: Me mostre o código da função `sendMessage` no `MessageService`.
-Assistente: [Exibe o bloco de código da função `sendMessage`...]
-Pergunta do Usuário: explique a validação de permissão nesse trecho
-
-**Instrução Autossuficiente Gerada:**
-Explique como funciona a validação de permissão na função `sendMessage` do `MessageService`.
----
-**Exemplo 4: Pedido de resumo**
-Histórico:
-Usuário: Quais são as principais funcionalidades do Rocket.Chat?
-Assistente: O Rocket.Chat oferece funcionalidades como chat em tempo real, videoconferência,
-e integração com outras plataformas.
-Pergunta do Usuário: Resuma isso
-
-**Instrução Autossuficiente Gerada:**
-Resuma as principais funcionalidades do Rocket.Chat, incluindo chat em tempo real, videoconferência
-e integração com outras plataformas.
-"""
-
-    
-    
     # 2. Cria o template do prompt usando as abstrações da LangChain.
     #    MessagesPlaceholder é o local onde o histórico da conversa será inserido.
     prompt = ChatPromptTemplate.from_messages([
@@ -219,22 +188,53 @@ def get_runnable_with_history():
         # Carrega o histórico da memória
         chat_history = memory.load_memory_variables({}).get("chat_history", [])
         question = inputs["question"]
-        
-        import click
-        # Se houver histórico, reescreve a pergunta. Senão, usa a original.
-        if not chat_history:
-            rewritten_question = question
-        else:
+
+        # Reescreve a pergunta se houver histórico
+        if chat_history:
             rewritten_question = rewrite_question_with_history(llm, chat_history, question)
-            click.secho(f"[Pergunta reescrita]: {rewritten_question}", fg="yellow")
-        
-        # Invoca a cadeia RAG com a pergunta (reescrita ou original)
+            print("[Pergunta reescrita]:", rewritten_question)
+        else:
+            rewritten_question = question
+
+        # Invoca a cadeia RAG com a pergunta reescrita ou original
         final_answer = rag_chain.invoke(rewritten_question)
-        
-        # Salva a pergunta ORIGINAL do usuário e a RESPOSTA FINAL na memória.
+
+        # Salva a pergunta ORIGINAL do usuário e a RESPOSTA FINAL na memória
         memory.save_context({"input": question}, {"output": final_answer})
-        
+
         return final_answer
 
     return rag_with_rewrite, memory
 
+def get_runnable_with_full_history():
+    """Prepara e retorna a cadeia conversacional E o objeto de memória."""
+    api_key = load_api_key()
+    llm = initialize_llm(api_key)
+    vector_store = load_vector_store(api_key)
+    retriever = create_retriever(vector_store)
+    memory = get_memory() 
+    prompt = create_prompt_template(use_history=True)
+    rag_chain = create_rag_chain(retriever, prompt, llm, use_history=True)
+
+    def rag_with_full_history(inputs):
+        """Função que encapsula a lógica de RAG com histórico completo."""
+        question = inputs["question"]
+        chat_history = memory.load_memory_variables({}).get("chat_history", [])
+
+        if chat_history:
+            rewritten_question = rewrite_question_with_history(llm, chat_history, question, prompt=REWRITE_PROMPT_2)
+            print("[Pergunta reescrita]:", rewritten_question)
+        else:
+            rewritten_question = question
+
+        final_answer = rag_chain.invoke({
+            "history": chat_history,
+            "question": question,
+            "prompt": rewritten_question
+        })
+
+        memory.save_context({"input": question}, {"output": final_answer})
+        return final_answer
+
+    # Altere esta linha para retornar os dois objetos
+    return rag_with_full_history, memory
