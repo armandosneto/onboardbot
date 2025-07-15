@@ -3,10 +3,15 @@ import os
 import glob
 from git import Repo
 from dotenv import load_dotenv
+
+from git import Repo, InvalidGitRepositoryError
+from datetime import datetime
+import os
 import random
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader
+from langchain_core.documents import Document
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
@@ -35,6 +40,32 @@ def clone_repository():
             raise
     else:
         print(f"Repositório já existe em '{ROCKETCHAT_REPO_PATH}'. Pulando clonagem.")
+        
+
+def get_repo_metadata(repo_path):
+    """
+    Obtém metadados do repositório Git, como a data do último commit, autor e nome do repositório.
+    """
+    try:
+        repo = Repo(repo_path)
+        head_commit = repo.head.commit
+
+        last_commit_date = datetime.fromtimestamp(head_commit.authored_date).strftime('%Y-%m-%d %H:%M:%S')
+        last_commit_author = head_commit.author.name
+        repo_name = os.path.basename(repo_path)
+
+        return {
+            "last_commit_date": last_commit_date,
+            "last_commit_author": last_commit_author,
+            "repo_name": repo_name
+        }
+
+    except InvalidGitRepositoryError:
+        print(f"Aviso: '{repo_path}' não é um repositório Git válido. Não foi possível extrair metadados.")
+    except Exception as e:
+        print(f"Erro ao obter metadados do repositório: {e}")
+
+    return {}
 
 def process_markdown_files(repo_path):
     """Carrega e processa arquivos Markdown, preservando a estrutura de cabeçalhos."""
@@ -119,13 +150,25 @@ def run_ingestion():
     load_dotenv()
     
     clone_repository()
-    
+
+    # Obter metadados do repositório
+    repo_metadata = get_repo_metadata(ROCKETCHAT_REPO_PATH)
+
     md_chunks = process_markdown_files(ROCKETCHAT_REPO_PATH)
     py_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.PYTHON, "py")
     js_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.JS, "js")
     ts_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.TS, "ts")
-    
+
     all_chunks = md_chunks + py_chunks + js_chunks + ts_chunks
+
+    # Adicionar metadados do repositório como um "documento" ao índice, se houver
+    if repo_metadata:
+        metadata_content = (
+            f"Informações do repositório '{repo_metadata.get('repo_name', 'N/A')}'\n"
+            f"Data do último commit: {repo_metadata.get('last_commit_date', 'N/A')}\n"
+            f"Autor do último commit: {repo_metadata.get('last_commit_author', 'N/A')}"
+        )
+        all_chunks.append(Document(page_content=metadata_content, metadata={"source": "repository_metadata"}))
 
     # Exibir aleatoriamente alguns chunks de cada tipo
     def print_random_chunks(chunks, tipo, n=3):
@@ -133,15 +176,9 @@ def run_ingestion():
         if not chunks:
             print("Nenhum chunk encontrado.")
             return
-        exemplos = random.sample(chunks, min(n, len(chunks)))
-        for i, chunk in enumerate(exemplos, 1):
-            print(f"--- {tipo} Chunk {i} ---")
-            if hasattr(chunk, 'page_content'):
-                print(chunk.page_content[:500])  # Limita a 500 caracteres
-            else:
-                print(str(chunk)[:500])
-            print(f"Fonte: {chunk.metadata.get('source', 'desconhecida')}")
-            print()
+        # Filtra chunks para incluir apenas aqueles com page_content ou que podem ser convertidos para string
+        valid_chunks = [c for c in chunks if hasattr(c, 'page_content') or isinstance(c, (str, dict))]
+        exemplos = random.sample(valid_chunks, min(n, len(valid_chunks))) if valid_chunks else []
 
     print_random_chunks(md_chunks, "Markdown")
     print_random_chunks(py_chunks, "Python")
@@ -149,3 +186,4 @@ def run_ingestion():
     print_random_chunks(ts_chunks, "TypeScript")
 
     create_and_save_faiss_index(all_chunks)
+

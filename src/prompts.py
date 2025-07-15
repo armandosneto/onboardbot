@@ -39,6 +39,7 @@ Regras Fundamentais:
 - **Autossuficiência:** Se a pergunta original já for clara e completa, retorne-a sem modificações.
 - **Regra de Escape:** Se a pergunta do usuário for vaga (ex: \"e sobre isso?\", \"quem são eles?\") e o histórico da conversa não fornecer NENHUM contexto relevante para resolver a ambiguidade, NÃO TENTE EXPLICAR O PROBLEMA. Apenas retorne a pergunta original do usuário sem nenhuma alteração.
 - **Atenção a sua função:** Sua função é reescrever o comando/pergunta do usuário, não responder a ela. Foque em criar uma pergunta clara e autossuficiente.
+- Somente fale sobre commit e histórico se for relevante para a pergunta.
 
 Exemplo de entrada:
 ---

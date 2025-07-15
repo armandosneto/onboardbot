@@ -1,100 +1,165 @@
 import click
 import time
 from src.data_ingestion import run_ingestion
-from src.rag_chain import get_runnable_with_history, get_runnable_with_full_history
-from langchain_core.messages import HumanMessage, AIMessage
+from src.rag_chain import (
+    ask_question,
+    get_runnable_with_history,
+    get_runnable_with_full_history
+)
 
 @click.group()
 def cli():
     """
     CLI para o chatbot RAG do Rocket.Chat.
-    Use 'ingest' para construir a base de conhecimento, 'ask' para perguntas únicas e 'chat' para uma sessão interativa.
+    Use 'ingest' para construir a base de conhecimento,
+    'ask' para perguntas únicas,
+    'chat' para sessão interativa simplificada,
+    'chat_full' para histórico completo.
     """
     pass
+
 
 @cli.command()
 def ingest():
     """
     Executa o pipeline de ingestão de dados:
-    1. Clona o repositório do Rocket.Chat.
-    2. Processa os arquivos de código e documentação.
-    3. Cria e salva um índice vetorial FAISS.
+      1. Clona o repositório.
+      2. Processa Markdown e código.
+      3. Cria e salva o índice FAISS.
     """
-    click.echo("Iniciando o processo de ingestão de dados...")
-    start_time = time.time()
+    click.echo("Iniciando ingestão de dados...")
+    start = time.time()
     try:
         run_ingestion()
-        end_time = time.time()
-        click.secho(f"Processo de ingestão concluído com sucesso em {end_time - start_time:.2f} segundos.", fg="green")
+        elapsed = time.time() - start
+        click.secho(f"Ingestão concluída em {elapsed:.2f}s.", fg="green")
     except Exception as e:
-        click.secho(f"O processo de ingestão falhou: {e}", fg="red")
+        click.secho(f"Falha na ingestão: {e}", fg="red")
+
 
 @cli.command()
 @click.argument('question', type=str)
-def ask(question):
+@click.option(
+    '--use-context/--no-context',
+    default=True,
+    help="Incluir contexto extraído do FAISS"
+)
+@click.option(
+    '--history-window',
+    default=3,
+    show_default=True,
+    help="Número de trocas de mensagem na memória"
+)
+def ask(question, use_context, history_window):
     """
-    Faz uma pergunta ao chatbot RAG.
-    A pergunta deve ser colocada entre aspas.
-    Exemplo: python main.py ask "Como funciona a autenticação?"
+    Faz uma pergunta única ao chatbot.
     """
-    click.echo(f"Pergunta recebida: '{question}'")
-    click.echo("Consultando a base de conhecimento e gerando uma resposta...")
-    start_time = time.time()
-    answer = ask_question(question)
-    end_time = time.time()
+    click.echo(
+        f"Pergunta: '{question}' | contexto: {use_context} | histórico: {history_window}"
+    )
+    click.echo("Gerando resposta...")
+    start = time.time()
+    answer = ask_question(
+        question=question,
+        use_context=use_context,
+        history_window=history_window
+    )
+    elapsed = time.time() - start
+
     click.secho("\n--- Resposta ---", fg="cyan")
     click.echo(answer)
     click.secho("----------------", fg="cyan")
-    click.echo(f"(Resposta gerada em {end_time - start_time:.2f} segundos)")
+    click.echo(f"(Gerado em {elapsed:.2f}s)")
+
 
 @cli.command()
-def chat():
+@click.option(
+    '--use-context/--no-context',
+    default=True,
+    help="Incluir contexto extraído do FAISS"
+)
+@click.option(
+    '--history-window',
+    default=3,
+    show_default=True,
+    help="Número de trocas de mensagem na memória"
+)
+def chat(use_context, history_window):
     """
-    Inicia uma sessão de chat interativa com reescrita explícita da pergunta baseada no histórico.
-    Digite 'sair' ou 'exit' para encerrar a sessão.
+    Sessão de chat interativa com janela de histórico limitada.
+    Digite 'sair' ou 'exit' para encerrar.
     """
-    click.secho("\nBem-vindo ao chat interativo! Digite sua pergunta ou 'sair' para encerrar.", fg="yellow")
-    rag_with_rewrite, memory = get_runnable_with_history()
-    session_id = "default"
+    click.secho(
+        "Iniciando sessão de chat (histórico limitado)…", fg="yellow"
+    )
+    rag_with_full, memory = get_runnable_with_full_history()
+
+
     while True:
-        user_input = click.prompt(click.style("Você", fg="green"), type=str)
+        user_input = click.prompt(
+            click.style("Você", fg="green"), type=str
+        )
         if user_input.strip().lower() in ["sair", "exit"]:
             click.secho("Sessão encerrada.", fg="yellow")
             break
-        start_time = time.time()
-        try:
-            response = rag_with_rewrite({"question": user_input})
-            end_time = time.time()
-            click.secho("\n--- Resposta ---", fg="cyan")
-            click.echo(response)
-            click.secho("----------------", fg="cyan")
-            click.echo(f"(Resposta gerada em {end_time - start_time:.2f} segundos)\n")
-        except Exception as e:
-            click.secho(f"Ocorreu um erro: {e}", fg="red")
+
+        start = time.time()
+        response = rag_with_rewrite({
+            "question": user_input,
+            "use_context": use_context
+        })
+        elapsed = time.time() - start
+
+        click.secho("\n--- Resposta ---", fg="cyan")
+        click.echo(response)
+        click.secho("----------------", fg="cyan")
+        click.echo(f"(Gerado em {elapsed:.2f}s)\n")
+
 
 @cli.command()
-def chat_full():
+@click.option(
+    '--use-context/--no-context',
+    default=True,
+    help="Incluir contexto extraído do FAISS"
+)
+@click.option(
+    '--history-window',
+    default=3,
+    show_default=True,
+    help="Número de trocas de mensagem na memória"
+)
+def chat_full(use_context, history_window):
     """
-    Inicia uma sessão de chat interativa com o histórico completo.
-    Digite 'sair' ou 'exit' para encerrar a sessão.
+    Sessão de chat interativa com histórico completo.
+    Digite 'sair' ou 'exit' para encerrar.
     """
-    click.secho("\nBem-vindo ao chat interativo com histórico completo! Digite sua pergunta ou 'sair' para encerrar.", fg="yellow")
-    rag_with_full_history, memory = get_runnable_with_full_history()
+    click.secho(
+        "Iniciando sessão de chat (histórico completo)…", fg="yellow"
+    )
+    rag_with_full, memory = get_runnable_with_full_history(
+        window_size=history_window
+    )
+
     while True:
-        user_input = click.prompt(click.style("Você", fg="green"), type=str)
+        user_input = click.prompt(
+            click.style("Você", fg="green"), type=str
+        )
         if user_input.strip().lower() in ["sair", "exit"]:
             click.secho("Sessão encerrada.", fg="yellow")
             break
-        start_time = time.time()
-        try:
-            response = rag_with_full_history({"question": user_input})
-            end_time = time.time()
-            click.secho("\n--- Resposta ---", fg="cyan")
-            click.echo(response)
-            click.secho("----------------", fg="cyan")
-            click.echo(f"(Resposta gerada em {end_time - start_time:.2f} segundos)\n")
-        except Exception as e:
-            click.secho(f"Ocorreu um erro: {e}", fg="red")
+
+        start = time.time()
+        response = rag_with_full({
+            "question": user_input,
+            "use_context": use_context
+        })
+        elapsed = time.time() - start
+
+        click.secho("\n--- Resposta ---", fg="cyan")
+        click.echo(response)
+        click.secho("----------------", fg="cyan")
+        click.echo(f"(Gerado em {elapsed:.2f}s)\n")
+
 
 if __name__ == '__main__':
     cli()
