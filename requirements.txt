@@ -17,3 +17,8 @@ GitPython==3.1.43
 # Dependencies for document loaders
 unstructured==0.17.2
 beautifulsoup4==4.12.3
+
+# Evaluation libraries
+ragas==0.1.17
+pandas==2.2.2
+openpyxl==3.1.2

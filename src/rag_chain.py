@@ -36,7 +36,10 @@ def initialize_llm(api_key):
 def load_vector_store(api_key):
     """Carrega o índice FAISS local."""
     os.environ["GOOGLE_API_KEY"] = api_key
-    embeddings = GoogleGenerativeAIEmbeddings(model=GEMINI_EMBEDDING_MODEL)
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model=GEMINI_EMBEDDING_MODEL,
+        google_api_key=api_key  # Passa explicitamente a chave
+    )
     
     if not os.path.exists(FAISS_INDEX_PATH):
         raise FileNotFoundError(f"Diretório do índice FAISS não encontrado em '{FAISS_INDEX_PATH}'. Execute a ingestão primeiro com 'python main.py ingest'.")
@@ -211,6 +214,60 @@ def ask_question(
 
     memory.save_context({"input": question}, {"output": answer})
     return answer
+
+def ask_question_with_context(
+    question: str,
+    use_context: bool = True,
+    history_window: int = 3
+):
+    """
+    Versão modificada da ask_question que retorna também o contexto recuperado
+    para uso na avaliação com RAGAS.
+    """
+    api_key = load_api_key()
+    llm     = initialize_llm(api_key)
+    store   = load_vector_store(api_key)
+    retriever = store.as_retriever(search_kwargs={"k": RETRIEVER_K})
+
+    # Memória configurável
+    memory = get_memory(history_window)
+
+    # Escolhe o template sem ou com histórico
+    prompt = create_prompt_template(use_history=False)
+    # Cria a chain RAG, mas decide incluir ou não o retriever
+    rag_chain = create_rag_chain(
+        retriever if use_context else None,
+        prompt,
+        llm,
+        use_history=False,
+        use_context=use_context
+    )
+
+    # Monta o input para invocação
+    inputs = {"question": question}
+    retrieved_docs = []
+    
+    if use_context:
+        # obtém docs só se for usar contexto
+        docs = retriever.get_relevant_documents(question)
+        retrieved_docs = docs  # Salva os documentos originais
+        inputs["context"] = format_docs(docs)
+    
+    # insere histórico se houver
+    hist = memory.load_memory_variables({})["chat_history"]
+    if hist:
+        inputs["history"] = hist
+
+    answer = rag_chain.invoke(inputs)
+
+    memory.save_context({"input": question}, {"output": answer})
+    
+    # Retorna resposta, documentos recuperados e contexto formatado
+    return {
+        "answer": answer,
+        "retrieved_docs": retrieved_docs,
+        "formatted_context": inputs.get("context", "")
+    }
 
 
 def get_memory(window_size: int = 3):
