@@ -39,30 +39,17 @@ def ingest():
 
 @cli.command()
 @click.argument('question', type=str)
-@click.option(
-    '--use-context/--no-context',
-    default=True,
-    help="Incluir contexto extraído do FAISS"
-)
-@click.option(
-    '--history-window',
-    default=3,
-    show_default=True,
-    help="Número de trocas de mensagem na memória"
-)
-def ask(question, use_context, history_window):
+def ask(question):
     """
     Faz uma pergunta única ao chatbot.
     """
     click.echo(
-        f"Pergunta: '{question}' | contexto: {use_context} | histórico: {history_window}"
+        f"Pergunta: '{question}'"
     )
     click.echo("Gerando resposta...")
     start = time.time()
     answer = ask_question(
         question=question,
-        use_context=use_context,
-        history_window=history_window
     )
     elapsed = time.time() - start
 

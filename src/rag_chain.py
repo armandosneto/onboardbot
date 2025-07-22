@@ -143,74 +143,76 @@ def create_rag_chain(
 
 #     return rag_chain
 
-# def ask_question(question: str):
-#     """Orquestra todo o processo de resposta a uma pergunta."""
-#     try:
-#         api_key = load_api_key()
-#         llm = initialize_llm(api_key)
-#         vector_store = load_vector_store(api_key)
-#         retriever = create_retriever(vector_store)
-#         prompt = create_prompt_template()
-#         rag_chain = create_rag_chain(retriever, prompt, llm)
+def ask_question(question: str):
+    """Orquestra todo o processo de resposta a uma pergunta."""
+    try:
+        api_key = load_api_key()
+        llm = initialize_llm(api_key)
+        vector_store = load_vector_store(api_key)
+        retriever = create_retriever(vector_store)
+        prompt = create_prompt_template()
+        rag_chain = create_rag_chain(
+            retriever,
+            prompt,
+            llm,
+            use_history=False,
+            use_context=True
+    )
 
-#         # Recupera os documentos para mostrar o prompt formatado
-#         docs = retriever.get_relevant_documents(question)
-#         context_str = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
-#         prompt_str = prompt.format(context=context_str, question=question)
-#         print("\nPrompt utilizado:\n" + "-"*40)
-#         print(prompt_str)
-#         print("-"*40)
+        # Recupera os documentos para mostrar o prompt formatado
+        docs = retriever.get_relevant_documents(question)
+        context_str = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
+        prompt_str = prompt.format(context=context_str, question=question)
+        print("\nPrompt utilizado:\n" + "-"*40)
+        print(prompt_str)
+        print("-"*40)
 
-#         print("Gerando resposta...")
-#         answer = rag_chain.invoke(question)
-#         return answer
-#     except Exception as e:
-#         return f"Ocorreu um erro ao processar sua pergunta: {e}"
+        print("Gerando resposta...")
+        answer = rag_chain.invoke({"question": question})
+        return answer
+    except Exception as e:
+        return f"Ocorreu um erro ao processar sua pergunta: {e}"
+
+def ask_question_with_context(question: str, use_context: bool = True):
+    """
+    Orquestra o processo de resposta a uma pergunta, retornando a resposta e o contexto.
+    """
+    try:
+        api_key = load_api_key()
+        llm = initialize_llm(api_key)
+        vector_store = load_vector_store(api_key)
+        retriever = create_retriever(vector_store) if use_context else None
+        
+        prompt = create_prompt_template(use_history=False)
+        
+        rag_chain = create_rag_chain(
+            retriever,
+            prompt,
+            llm,
+            use_history=False,
+            use_context=use_context
+        )
+
+        retrieved_docs = []
+        if use_context and retriever:
+            retrieved_docs = retriever.get_relevant_documents(question)
+
+        answer = rag_chain.invoke({"question": question})
+
+        return {
+            "answer": answer,
+            "retrieved_docs": retrieved_docs
+        }
+    except Exception as e:
+        return {
+            "answer": f"Ocorreu um erro: {e}",
+            "retrieved_docs": []
+        }
 
 def format_docs(docs):
     """Formata os documentos recuperados em uma única string, incluindo a fonte."""
     formatted_docs = "\n\n".join(f"Fonte: {doc.metadata.get('source', 'N/A')}\nConteúdo: {doc.page_content}" for doc in docs)
     return formatted_docs
-
-def ask_question(
-    question: str,
-    use_context: bool = True,
-    history_window: int = 3
-):
-    api_key = load_api_key()
-    llm     = initialize_llm(api_key)
-    store   = load_vector_store(api_key)
-    retriever = store.as_retriever(search_kwargs={"k": RETRIEVER_K})
-
-    # Memória configurável
-    memory = get_memory(history_window)
-
-    # Escolhe o template sem ou com histórico
-    prompt = create_prompt_template(use_history=False)
-    # Cria a chain RAG, mas decide incluir ou não o retriever
-    rag_chain = create_rag_chain(
-        retriever if use_context else None,
-        prompt,
-        llm,
-        use_history=False,
-        use_context=use_context
-    )
-
-    # Monta o input para invocação
-    inputs = {"question": question}
-    if use_context:
-        # obtém docs só se for usar contexto
-        docs = retriever.get_relevant_documents(question)
-        inputs["context"] = format_docs(docs)  # defina sua função format_docs
-    # insere histórico se houver
-    hist = memory.load_memory_variables({})["chat_history"]
-    if hist:
-        inputs["history"] = hist
-
-    answer = rag_chain.invoke(inputs)
-
-    memory.save_context({"input": question}, {"output": answer})
-    return answer
 
 
 def get_memory(window_size: int = 3):

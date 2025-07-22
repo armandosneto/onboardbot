@@ -1,0 +1,102 @@
+[
+  {
+    "question": "O que é o Rocket.Chat?",
+    "answer": "É uma plataforma de comunicação open-source e totalmente personalizável, destinada a organizações que exigem alta proteção de dados."
+  },
+  {
+    "question": "Qual linguagem principal do projeto?",
+    "answer": "O Rocket.Chat é desenvolvido principalmente em TypeScript (~92,7%) e JavaScript (~3,4%)."
+  },
+  {
+    "question": "Como posso contribuir para o projeto?",
+    "answer": "O repositório encoraja contribuições via GitHub, seguindo o guia 'Modes of contribution'."
+  },
+  {
+    "question": "Quais são os principais produtos oferecidos?",
+    "answer": "4 ofertas principais: colaboração de equipe, omnichannel para atendimento, chat engine e marketplace."
+  },
+  {
+    "question": "Existe uma versão cloud no Rocket.Chat?",
+    "answer": "Sim: há hospedagem em nuvem com opções flexíveis para infraestrutura."
+  },
+  {
+    "question": "Como instalar localmente para desenvolvimento?",
+    "answer": "Há guias específicos para Linux, macOS, Windows (e Gitpod) nos documentos de desenvolvedor."
+  },
+  {
+    "question": "Como funciona a autenticação?",
+    "answer": "O projeto suporta diversos métodos (LDAP, OAuth, SAML, etc.), implementados no código do servidor e pacotes de apps."
+  },
+  {
+    "question": "Quais frameworks ou tecnologias são usados?",
+    "answer": "É baseado em Meteor, WebRTC, e uma stack JavaScript/TypeScript elaborada com npm/yarn."
+  },
+  {
+    "question": "Como é feita a gestão de apps?",
+    "answer": "Utiliza o Apps‑Engine — um framework open‑source para criar e integrar apps com a plataforma."
+  },
+  {
+    "question": "Onde encontro a documentação sobre APIs?",
+    "answer": "Nos links 'API documentation' e 'Developer documentation' disponíveis no README."
+  },
+  {
+    "question": "Qual é a licença do projeto?",
+    "answer": "Verifique o arquivo LICENSE: trata-se de uma licença open‑source."
+  },
+  {
+    "question": "Quantas estrelas e forks o repositório tem?",
+    "answer": "Aproximadamente 43 mil estrelas e 11,9 mil forks."
+  },
+  {
+    "question": "Há apps móveis oficiais?",
+    "answer": "Sim — clientes nativos para iOS e Android, além do código‑fonte em Rocket.Chat.ReactNative."
+  },
+  {
+    "question": "Onde posso pedir suporte ou participar da comunidade?",
+    "answer": "Há um servidor Rocket.Chat aberto com canais como #support e #general."
+  },
+  {
+    "question": "Como reportar uma vulnerabilidade de segurança?",
+    "answer": "Existe um arquivo SECURITY.md que orienta como lidar com issues de segurança."
+  },
+  {
+    "question": "Quais requisitos para deployment?",
+    "answer": "Há link para 'System requirements documentation', incluindo hardware e software mínimos."
+  },
+  {
+    "question": "Como manter o histórico de mudanças do projeto?",
+    "answer": "O arquivo HISTORY.md documenta o histórico de lançamentos e alterações."
+  },
+  {
+    "question": "Qual versão estável mais recente?",
+    "answer": "A última versão no repositório é a 7.8.0, lançada em 8 de julho de 2025."
+  },
+  {
+    "question": "Qual conduta de projeto adotam?",
+    "answer": "Existe um CODE_OF_CONDUCT.md definindo padrões de comportamento comunitário."
+  },
+  {
+    "question": "Há integrações disponíveis?",
+    "answer": "Sim – o Marketplace inclui diversos apps e integrações nativas para ampliar funcionalidades."
+  },
+  {
+    "question": "O que o arquivo server/main.js implementa?",
+    "answer": "Ele é o ponto de entrada principal do lado do servidor. Inicializa o ambiente Meteor, carrega configurações e define os serviços principais da aplicação."
+  },
+  {
+    "question": "O que o arquivo app/authentication/server/index.ts faz?",
+    "answer": "Ele gerencia os métodos de autenticação no lado do servidor, como login via senha, token, OAuth, etc., centralizando os fluxos de autenticação."
+  },
+  {
+    "question": "O que é implementado em app/ui-message/client/messageBox/messageBox.ts?",
+    "answer": "Define a lógica e interações da caixa de mensagem (componente de envio de mensagens), incluindo eventos e comportamentos de UI do chat."
+  },
+  {
+    "question": "Para que serve scripts/start.sh?",
+    "answer": "Script shell que inicia o servidor localmente, útil para desenvolvimento e testes manuais."
+  },
+  {
+    "question": "O que o arquivo README.md apresenta?",
+    "answer": "Fornece uma visão geral do projeto, instruções de instalação, formas de contribuição, links para documentação, licenciamento e suporte da comunidade."
+  }
+]
