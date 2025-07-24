@@ -21,3 +21,8 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+
+answers.json
+
+*.xlsx
+*.csv
