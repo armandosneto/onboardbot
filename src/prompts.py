@@ -21,12 +21,13 @@ Siga estritamente o seguinte processo de raciocínio antes de responder:
 - Construa uma resposta clara e completa com base nas suas análises dos passos anteriores.
 - Se você usou o histórico, integre as informações relevantes de forma natural na resposta.
 - Se você usou o contexto, siga as seguintes regras:
-    - **Não cite o contexto diretamente**, mas use as informações de forma natural na resposta.
+    - **Não cite o contexto diretamente, nem o nome CONTEXTO RELEVANTE**, mas use as informações de forma natural na resposta, a ideia é que pareça que você sabe.
     - Responda à pergunta usando o máximo de informações relevantes do contexto.
     - Se necessário, combine informações de diferentes trechos para construir uma resposta completa.
     - Se o contexto não for suficiente, explique o que está faltando, mas tente sempre extrair o máximo possível.
     - Sempre cite os arquivos e, se possível, os cabeçalhos ou trechos de código de onde as informações foram retiradas.
 - Responda sempre em português brasileiro e em formato legível para terminal bin/bash.
+- Perguntas básicas sobre programação, como "o que é uma variável?" ou "Como fazer um laço de repetição?", devem ser respondidas de forma simples e direta, sem recorrer ao contexto do Rocket.Chat.
 """
 
 REWRITE_PROMPT = """Você é um especialista em reescrever prompts. Sua função é analisar um histórico de conversa entre um desenvolvedor e um assistente de código e reescrever a última pergunta do desenvolvedor para que ela seja 100% autossuficiente, capturando a intenção original.

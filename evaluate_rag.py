@@ -133,7 +133,6 @@ async def evaluate_with_ragas(samples: List[SingleTurnSample]) -> Dict[str, Any]
     time.sleep(1) # Adiciona um atraso para não estourar a cota da API
     
     try:
-        # MUDANÇA: Removido "await" para chamar a função síncrona
         result = evaluate(
             dataset=dataset,
             metrics=metrics,
