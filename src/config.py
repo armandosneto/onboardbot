@@ -18,7 +18,7 @@ FAISS_INDEX_PATH = os.path.join(PROJECT_ROOT, "vector_store", "faiss_index")
 # Modelo de embedding recomendado para tarefas de recuperação de documentos [1]
 GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
 # Modelo de geração de texto, otimizado para velocidade e custo
-GEMINI_GENERATION_MODEL = "gemini-1.5-flash"
+GEMINI_GENERATION_MODEL = "gemini-2.5-pro"
 
 # --- RAG Configuration ---
 # Número de documentos relevantes a serem recuperados para o contexto

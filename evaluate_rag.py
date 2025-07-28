@@ -29,7 +29,7 @@ import asyncio
 from src.rag_chain import ask_question_with_context, load_api_key
 
 config = {
-    "model": "gemini-1.5-flash",  # or other model IDs
+    "model": "gemini-1.5-pro",  # or other model IDs
     "temperature": 0,
     "max_tokens": None
 }
