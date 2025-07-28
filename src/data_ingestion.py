@@ -155,29 +155,6 @@ def process_code_files(repo_path, language, extension):
     print(f"Processados {len(all_code_chunks)} chunks de {len(code_files)} arquivos *.{extension}.")
     return all_code_chunks
 
-def process_json_files(repo_path):
-    """Carrega e processa arquivos JSON."""
-    print("Processando arquivos JSON...")
-    json_files = glob.glob(os.path.join(repo_path, "**/*.json"), recursive=True)
-    all_json_chunks = []
-
-    for json_file in json_files:
-        try:
-            with open(json_file, 'r', encoding='utf-8') as f:
-                content = f.read()
-            # Adiciona o conteúdo do JSON como um único chunk
-            chunk = Document(
-                page_content=content,
-                metadata={"source": os.path.relpath(json_file, PROJECT_ROOT)}
-            )
-            all_json_chunks.append(chunk)
-        except Exception as e:
-            print(f"Aviso: Pulando arquivo JSON com erro de leitura: {json_file}")
-            pass
-
-    print(f"Processados {len(all_json_chunks)} chunks de {len(json_files)} arquivos JSON.")
-    return all_json_chunks
-
 def create_and_save_faiss_index(all_chunks):
     """Cria um índice FAISS a partir dos chunks e o salva localmente."""
     if not all_chunks:
@@ -217,9 +194,8 @@ def run_ingestion():
     py_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.PYTHON, "py")
     js_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.JS, "js")
     ts_chunks = process_code_files(ROCKETCHAT_REPO_PATH, Language.TS, "ts")
-    json_chunks = process_json_files(ROCKETCHAT_REPO_PATH)
 
-    all_chunks = md_chunks + py_chunks + js_chunks + ts_chunks + json_chunks
+    all_chunks = md_chunks + py_chunks + js_chunks + ts_chunks
 
     # Adicionar metadados do repositório como um "documento" ao índice, se houver
     if repo_metadata:
@@ -254,7 +230,6 @@ def run_ingestion():
     print_random_chunks(py_chunks, "Python")
     print_random_chunks(js_chunks, "JavaScript")
     print_random_chunks(ts_chunks, "TypeScript")
-    print_random_chunks(json_chunks, "JSON")
 
     create_and_save_faiss_index(all_chunks)
 
