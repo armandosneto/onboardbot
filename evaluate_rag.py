@@ -237,7 +237,7 @@ async def main():
     answers_path = "answers.json"
     # CONTROLE DE FLUXO: Ajuste o tamanho do lote para não estourar a cota da API.
     # 5 é um valor seguro para começar.
-    batch_size = 1
+    batch_size = 5
 
     try:
         # --- Etapa 1: Carregar dados de teste ---
