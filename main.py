@@ -79,7 +79,9 @@ def chat(use_context, history_window):
     click.secho(
         "Iniciando sessão de chat (histórico limitado)…", fg="yellow"
     )
-    rag_with_full, memory = get_runnable_with_full_history()
+    rag_with_rewrite, memory = get_runnable_with_history(
+        window_size=history_window
+    )
 
 
     while True:
